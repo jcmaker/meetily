@@ -66,7 +66,7 @@ A privacy-first AI meeting assistant that captures, transcribes, and summarizes 
 
 ## Introduction
 
-Meetily is a privacy-first AI meeting assistant that runs entirely on your local machine. It captures your meetings, transcribes them in real-time, and generates summaries, all without sending any data to the cloud. This makes it the perfect solution for professionals and enterprises who need to maintain complete control over their sensitive information.
+Meetily captures and transcribes meetings locally. Summaries can use a local model or a selected cloud provider; cloud summaries send transcript text to that provider.
 
 ## Why Meetily?
 
@@ -156,6 +156,10 @@ Import existing audio files to generate transcripts, or enhance to re-transcribe
 ### 🤖 AI-Powered Summaries
 
 Generate meeting summaries with your choice of AI provider. **Ollama** (local) is recommended, with support for Claude, Groq, OpenRouter, and OpenAI.
+
+### ChatGPT plan sign-in (personal fork)
+
+In **Settings → Summary Model Configuration**, choose **ChatGPT plan**, select **Continue with ChatGPT**, complete browser sign-in, choose an available model, and save. An eligible ChatGPT Plus or Pro account can authorize text summaries through its plan or credits. Manage access and usage in [ChatGPT settings](https://chatgpt.com/settings/usage). Meetily sends transcript text and summary instructions to OpenAI for this provider; recording and transcription remain local. The existing **OpenAI** API-key and **Claude** API-key providers remain separate. Claude subscription login is not supported in third-party apps without Anthropic approval.
 
 <p align="center">
     <img src="docs/summary.png" width="650" style="border-radius: 10px;" alt="Summary generation" />

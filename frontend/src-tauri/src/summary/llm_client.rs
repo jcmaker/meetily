@@ -214,6 +214,7 @@ pub(crate) fn ollama_rejects_reasoning_effort(status: reqwest::StatusCode, body:
 #[derive(Debug, Clone, PartialEq)]
 pub enum LLMProvider {
     OpenAI,
+    ChatGPT,
     Claude,
     Groq,
     Ollama,
@@ -227,6 +228,7 @@ impl LLMProvider {
     pub fn from_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "openai" => Ok(Self::OpenAI),
+            "chatgpt" => Ok(Self::ChatGPT),
             "claude" => Ok(Self::Claude),
             "groq" => Ok(Self::Groq),
             "ollama" => Ok(Self::Ollama),
@@ -298,11 +300,19 @@ pub(crate) async fn generate_summary(
         .map_err(|e| e.to_string());
     }
 
+    if provider == &LLMProvider::ChatGPT {
+        let dir = app_data_dir.ok_or("App data directory is required for ChatGPT")?;
+        return crate::chatgpt::generate_response(
+            client, dir, model_name, system_prompt, user_prompt, cancellation_token,
+        ).await.map(|content| LlmCompletion { content, reasoning_stripped: false });
+    }
+
     let (api_url, mut headers) = match provider {
         LLMProvider::OpenAI => (
             "https://api.openai.com/v1/chat/completions".to_string(),
             header::HeaderMap::new(),
         ),
+        LLMProvider::ChatGPT => unreachable!("ChatGPT is handled above"),
         LLMProvider::Groq => (
             "https://api.groq.com/openai/v1/chat/completions".to_string(),
             header::HeaderMap::new(),
@@ -916,6 +926,7 @@ mod tests {
 fn provider_name(provider: &LLMProvider) -> &str {
     match provider {
         LLMProvider::OpenAI => "OpenAI",
+        LLMProvider::ChatGPT => "ChatGPT",
         LLMProvider::Claude => "Claude",
         LLMProvider::Groq => "Groq",
         LLMProvider::Ollama => "Ollama",

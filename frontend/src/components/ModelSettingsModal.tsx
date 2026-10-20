@@ -31,7 +31,7 @@ import { cn, isOllamaNotInstalledError } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export interface ModelConfig {
-  provider: 'ollama' | 'groq' | 'claude' | 'openai' | 'openrouter' | 'builtin-ai' | 'custom-openai';
+  provider: 'ollama' | 'groq' | 'claude' | 'openai' | 'chatgpt' | 'openrouter' | 'builtin-ai' | 'custom-openai';
   model: string;
   whisperModel: string;
   apiKey?: string | null;
@@ -162,6 +162,9 @@ export function ModelSettingsModal({
   const [openaiModels, setOpenaiModels] = useState<string[]>([]);
   const [claudeModels, setClaudeModels] = useState<string[]>([]);
   const [groqModels, setGroqModels] = useState<string[]>([]);
+  const [chatgptModels, setChatgptModels] = useState<string[]>([]);
+  const [chatgptSession, setChatgptSession] = useState<{email: string | null; connected: boolean; plan_enabled: boolean} | null>(null);
+  const [isChatgptLoading, setIsChatgptLoading] = useState(false);
   const [isLoadingOpenAI, setIsLoadingOpenAI] = useState<boolean>(false);
   const [isLoadingClaude, setIsLoadingClaude] = useState<boolean>(false);
   const [isLoadingGroq, setIsLoadingGroq] = useState<boolean>(false);
@@ -228,6 +231,7 @@ export function ModelSettingsModal({
     claude: claudeModels.length > 0 ? claudeModels : CLAUDE_FALLBACK_MODELS,
     groq: groqModels.length > 0 ? groqModels : GROQ_FALLBACK_MODELS,
     openai: openaiModels.length > 0 ? openaiModels : OPENAI_FALLBACK_MODELS,
+    chatgpt: chatgptModels,
     openrouter: openRouterModels.map((m) => m.id),
     'builtin-ai': builtinAiModels.map((m) => m.name),
     'custom-openai': customOpenAIModel ? [customOpenAIModel] : [], // User specifies model manually
@@ -251,6 +255,7 @@ export function ModelSettingsModal({
 
   const isDoneDisabled =
     (requiresApiKey && (!apiKey || (typeof apiKey === 'string' && !apiKey.trim()))) ||
+    (modelConfig.provider === 'chatgpt' && (!chatgptSession?.plan_enabled || !chatgptModels.includes(modelConfig.model))) ||
     (modelConfig.provider === 'ollama' && ollamaEndpointChanged) ||
     isCustomOpenAIInvalid;
 
@@ -268,7 +273,7 @@ export function ModelSettingsModal({
           setModelConfig(data);
 
           // Fetch API key if not included in response and provider requires it
-          if (data.provider !== 'ollama' && !data.apiKey) {
+          if (data.provider !== 'ollama' && data.provider !== 'chatgpt' && !data.apiKey) {
             try {
               const apiKeyData = await invoke('api_get_api_key', {
                 provider: data.provider
@@ -579,6 +584,58 @@ export function ModelSettingsModal({
 
   // Auto-fetch OpenAI models when provider is openai and we have an API key
   useEffect(() => {
+    if (modelConfig.provider !== 'chatgpt') return;
+    let active = true;
+    const load = async () => {
+      setIsChatgptLoading(true);
+      try {
+        const session = await invoke<{email: string | null; connected: boolean; plan_enabled: boolean}>('chatgpt_get_session');
+        if (active) setChatgptSession(session);
+        const models = session.plan_enabled ? await invoke<{slug: string; display_name: string}[]>('chatgpt_list_models') : [];
+        if (active) {
+          setChatgptModels(models.map(model => model.slug));
+          if (models.length) {
+            setModelConfig((prev: ModelConfig) => ({ ...prev, model: models.some(model => model.slug === prev.model) ? prev.model : models[0].slug }));
+          }
+        }
+      } catch (error) {
+        if (active) toast.error(`Could not load ChatGPT models: ${error}`);
+      } finally {
+        if (active) setIsChatgptLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [modelConfig.provider]);
+
+  const signInChatgpt = async () => {
+    setIsChatgptLoading(true);
+    try {
+      const session = await invoke<{email: string | null; connected: boolean; plan_enabled: boolean}>('chatgpt_sign_in');
+      setChatgptSession(session);
+      const models = await invoke<{slug: string; display_name: string}[]>('chatgpt_list_models');
+      setChatgptModels(models.map(model => model.slug));
+      setModelConfig((prev: ModelConfig) => prev.provider === 'chatgpt' ? { ...prev, model: models[0]?.slug || '' } : prev);
+      toast.success('Using ChatGPT plan for meeting summaries');
+    } catch (error) {
+      toast.error(`ChatGPT sign-in failed: ${error}`);
+    } finally { setIsChatgptLoading(false); }
+  };
+
+  const signOutChatgpt = async () => {
+    setIsChatgptLoading(true);
+    try {
+      const warning = await invoke<string>('chatgpt_sign_out');
+      setChatgptSession({ email: null, connected: false, plan_enabled: false });
+      setChatgptModels([]);
+      setModelConfig((prev: ModelConfig) => prev.provider === 'chatgpt' ? { ...prev, model: '' } : prev);
+      if (warning) toast.warning(warning); else toast.success('Signed out of ChatGPT');
+    } catch (error) { toast.error(`Could not sign out: ${error}`); }
+    finally { setIsChatgptLoading(false); }
+  };
+
+  // Auto-fetch OpenAI models when provider is openai and we have an API key
+  useEffect(() => {
     if (modelConfig.provider === 'openai' && apiKey?.trim()) {
       loadOpenAIModels(apiKey);
     }
@@ -612,7 +669,7 @@ export function ModelSettingsModal({
     if (cachedModel && providerModels.includes(cachedModel)) {
       setModelConfig((prev: ModelConfig) => ({ ...prev, model: cachedModel }));
     }
-  }, [models, openRouterModels, builtinAiModels, openaiModels, claudeModels, groqModels, modelConfig.provider]);
+  }, [models, openRouterModels, builtinAiModels, openaiModels, claudeModels, groqModels, chatgptModels, modelConfig.provider]);
 
   const handleSave = async () => {
     // For custom-openai provider, save the custom config first
@@ -636,7 +693,7 @@ export function ModelSettingsModal({
 
     const updatedConfig = {
       ...modelConfig,
-      apiKey: typeof apiKey === 'string' ? apiKey.trim() || null : null,
+      apiKey: modelConfig.provider === 'chatgpt' ? null : typeof apiKey === 'string' ? apiKey.trim() || null : null,
       ollamaEndpoint: modelConfig.provider === 'ollama'
         ? (ollamaEndpoint.trim() || null)
         : (modelConfig.ollamaEndpoint || null),
@@ -880,6 +937,7 @@ export function ModelSettingsModal({
                 <SelectItem value="groq">Groq</SelectItem>
                 <SelectItem value="ollama">Ollama</SelectItem>
                 <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="chatgpt">ChatGPT plan</SelectItem>
                 <SelectItem value="openrouter">OpenRouter</SelectItem>
               </SelectContent>
             </Select>
@@ -905,6 +963,7 @@ export function ModelSettingsModal({
                     <CommandList className="max-h-[300px]">
                       {(modelConfig.provider === 'openrouter' && isLoadingOpenRouter) ||
                        (modelConfig.provider === 'openai' && isLoadingOpenAI) ||
+                       (modelConfig.provider === 'chatgpt' && isChatgptLoading) ||
                        (modelConfig.provider === 'claude' && isLoadingClaude) ||
                        (modelConfig.provider === 'groq' && isLoadingGroq) ? (
                         <div className="py-6 text-center text-sm text-muted-foreground">
@@ -1110,6 +1169,22 @@ export function ModelSettingsModal({
                   {showApiKey ? <EyeOff /> : <Eye />}
                 </Button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {modelConfig.provider === 'chatgpt' && (
+          <div className="rounded-md border p-4 space-y-3">
+            <p className="text-sm">{chatgptSession?.plan_enabled
+              ? `Using ChatGPT plan${chatgptSession.email ? ` as ${chatgptSession.email}` : ''}`
+              : 'Connect an eligible ChatGPT Plus or Pro account to summarize meetings.'}</p>
+            <div className="flex gap-2">
+              {chatgptSession?.connected ? (
+                <Button type="button" variant="outline" onClick={signOutChatgpt} disabled={isChatgptLoading}>Sign out</Button>
+              ) : (
+                <Button type="button" onClick={signInChatgpt} disabled={isChatgptLoading}>Continue with ChatGPT</Button>
+              )}
+              <Button type="button" variant="outline" onClick={() => invoke('chatgpt_open_usage').catch(error => toast.error(`Could not open usage settings: ${error}`))}>Manage usage</Button>
             </div>
           </div>
         )}

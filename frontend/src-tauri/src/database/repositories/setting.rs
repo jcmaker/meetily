@@ -111,6 +111,7 @@ impl SettingsRepository {
         pool: &SqlitePool,
         provider: &str,
     ) -> std::result::Result<Option<String>, sqlx::Error> {
+        if provider == "chatgpt" { return Ok(None); }
         // Custom OpenAI uses JSON config - extract API key from there
         if provider == "custom-openai" {
             let config = Self::get_custom_openai_config(pool).await?;
