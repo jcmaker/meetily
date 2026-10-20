@@ -526,11 +526,7 @@ pub async fn chatgpt_sign_out<R: Runtime>(app: AppHandle<R>) -> Result<String, S
             }
         }
     }
-    if let Some(profile) = &mut store.profile {
-        profile.access_token = None;
-        profile.refresh_token = None;
-        profile.id_token.clear();
-    }
+    store.profile = None;
     save_store(&dir, &store)?;
     Ok(warning)
 }
