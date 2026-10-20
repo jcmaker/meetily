@@ -123,6 +123,10 @@ dirs = "5.0.1"
 
 # Additional dependencies for notification system
 url = "2.5.0"
+base64 = "0.22"
+sha2 = "0.10"
+jsonwebtoken = "9"
+webbrowser = "1"
 
 
 # System monitoring for resource management

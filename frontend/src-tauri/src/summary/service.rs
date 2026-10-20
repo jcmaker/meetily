@@ -360,7 +360,7 @@ impl SummaryService {
         };
 
         // Validate and setup api_key, Flexible for Ollama, BuiltInAI, and CustomOpenAI
-        let api_key = if provider == LLMProvider::Ollama || provider == LLMProvider::BuiltInAI || provider == LLMProvider::CustomOpenAI {
+        let api_key = if provider == LLMProvider::Ollama || provider == LLMProvider::BuiltInAI || provider == LLMProvider::CustomOpenAI || provider == LLMProvider::ChatGPT {
             // These providers don't require API keys from the standard database column
             String::new()
         } else {

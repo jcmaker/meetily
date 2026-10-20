@@ -34,7 +34,7 @@ export function useModelConfiguration({ serverAddress }: UseModelConfigurationPr
             ollamaEndpoint: data.ollamaEndpoint || 'default'
           });
           // Fetch API key if not included and provider requires it
-          if (data.provider !== 'ollama' && data.provider !== 'custom-openai' && !data.apiKey) {
+          if (data.provider !== 'ollama' && data.provider !== 'custom-openai' && data.provider !== 'chatgpt' && !data.apiKey) {
             try {
               const apiKeyData = await invokeTauri('api_get_api_key', {
                 provider: data.provider

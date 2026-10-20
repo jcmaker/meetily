@@ -39,6 +39,7 @@ pub mod analytics;
 pub mod api;
 pub mod audio;
 pub mod config;
+pub mod chatgpt;
 pub mod console_utils;
 pub mod database;
 pub mod notifications;
@@ -710,6 +711,11 @@ pub fn run() {
             ollama::delete_ollama_model,
             ollama::get_ollama_model_context,
             openai::openai::get_openai_models,
+            chatgpt::chatgpt_get_session,
+            chatgpt::chatgpt_sign_in,
+            chatgpt::chatgpt_sign_out,
+            chatgpt::chatgpt_list_models,
+            chatgpt::chatgpt_open_usage,
             anthropic::anthropic::get_anthropic_models,
             groq::groq::get_groq_models,
             api::api_get_meetings,
